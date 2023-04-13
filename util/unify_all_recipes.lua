@@ -120,12 +120,24 @@ end
 
 for _, recipe in pairs(data.raw.recipe) do
     local base_item
-    if recipe.main_product and not recipe.main_product == "" then
+    if recipe.main_product and recipe.main_product ~= "" then
         base_item = get_item_deepcopy(recipe.main_product)
+    elseif recipe.normal and recipe.normal.main_product and recipe.normal.main_product ~= "" then
+        base_item = get_item_deepcopy(recipe.normal.main_product)
+    elseif recipe.expensive and recipe.expensive.main_product and recipe.expensive.main_product ~= "" then
+        base_item = get_item_deepcopy(recipe.expensive.main_product)
     elseif recipe.result then
         base_item = get_item_deepcopy(recipe.result)
+    elseif recipe.normal and recipe.normal.result then
+        base_item = get_item_deepcopy(recipe.normal.result)
+    elseif recipe.expensive and recipe.expensive.result then
+        base_item = get_item_deepcopy(recipe.expensive.result)
     elseif recipe.results and #recipe.results == 1 then
         base_item = get_item_deepcopy(recipe.results[1].name)
+    elseif recipe.normal and recipe.normal.results and #recipe.normal.results == 1 then
+        base_item = get_item_deepcopy(recipe.normal.results[1].name)
+    elseif recipe.expensive and recipe.expensive.results and #recipe.expensive.results == 1 then
+        base_item = get_item_deepcopy(recipe.expensive.results[1].name)
     else
         base_item = get_item_deepcopy(recipe.name)
     end
@@ -139,6 +151,8 @@ for _, recipe in pairs(data.raw.recipe) do
             recipe.icon_mipmaps = nil
         else
             if not base_item then
+                log(serpent.line(recipe))
+                log(serpent.line(base_item))
                 error(recipe.name.." has no base item or fluid found to take icons from and the recipe does not have any on its own")
             end
             recipe.icons = get_propper_icons(base_item)

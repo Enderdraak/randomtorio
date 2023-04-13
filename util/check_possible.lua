@@ -59,7 +59,7 @@ local get_resource_list = function()
         end
     end
     for _, pump in pairs(data.raw["offshore-pump"]) do
-        resource_list["offshore-pump-"..pump.fluid] = {
+        resource_list["offshore-pump-"..pump.fluid.."-"..pump.name] = {
             ingredients = {
                 {
                     type = "item",
@@ -96,9 +96,29 @@ local get_resource_list = function()
                 },
                 results = {
                     {
-                    type = "fluid",
+                    type = "item",
                     name = item.burnt_result,
                     amount = 1
+                    },
+                }
+            }
+        end
+    end
+    for _, item in pairs(data.raw.item) do
+        if item.rocket_launch_product then
+            resource_list["burn-"..item.name] = {
+                ingredients = {
+                    {
+                        type = "item",
+                        name = item.name,
+                        amount = 1
+                    },
+                },
+                results = {
+                    {
+                    type = "item",
+                    name = item.rocket_launch_product[1],
+                    amount = item.rocket_launch_product[2]
                     },
                 }
             }
@@ -154,31 +174,51 @@ local get_science_packs = function()
             end
         end
     end
+    if randomtorio_techs then
+        for item, techs in pairs(randomtorio_techs) do
+            for _, tech in pairs(techs) do
+                if data.raw.technology[tech] then
+                    science_packs[item] = true
+                end
+            end
+        end
+    end
     return science_packs
 end
 
 local get_researched_recipes = function(pack_list, new_pack, difficulty)
-    log(serpent.line(pack_list).."\n"..difficulty.."  "..new_pack)
     local return_list = {}
-    for _, tech in pairs(data.raw.technology) do
-        local is_new = false
-        local can_be_researched = true
-        for _, packs in pairs(tech.unit.ingredients) do
-            if not pack_list[packs[1]] then
-                can_be_researched = false
-            elseif packs[1] == new_pack then
-                is_new = true
-            end
+    local techs_on_item = {}
+    if randomtorio_techs[new_pack] then
+        for _, name in pairs(randomtorio_techs[new_pack]) do
+            techs_on_item[name] = true
         end
-        if is_new and can_be_researched then
-            if tech.effects then
-                for _, effect in pairs(tech.effects) do
-                    if effect.type == "unlock-recipe" then
-                        if data.raw.recipe[effect.recipe][difficulty] then
-                            return_list[effect.recipe] = {
-                                ingredients = data.raw.recipe[effect.recipe][difficulty].ingredients,
-                                results = data.raw.recipe[effect.recipe][difficulty].results
-                            }
+    end
+    for name, tech in pairs(data.raw.technology) do
+        if not tech.hidden then
+            local is_new = false
+            local can_be_researched = true
+            for _, packs in pairs(tech.unit.ingredients) do
+                if not pack_list[packs[1]] and not pack_list[packs.name] then
+                    can_be_researched = false
+                elseif packs[1] == new_pack or packs.name == new_pack then
+                    is_new = true
+                end
+            end
+            if techs_on_item[name] then
+                is_new = true
+                can_be_researched = true
+            end
+            if is_new and can_be_researched then
+                if tech.effects then
+                    for _, effect in pairs(tech.effects) do
+                        if effect.type == "unlock-recipe" then
+                            if data.raw.recipe[effect.recipe][difficulty] then
+                                return_list[effect.recipe] = {
+                                    ingredients = data.raw.recipe[effect.recipe][difficulty].ingredients,
+                                    results = data.raw.recipe[effect.recipe][difficulty].results
+                                }
+                            end
                         end
                     end
                 end
@@ -188,6 +228,15 @@ local get_researched_recipes = function(pack_list, new_pack, difficulty)
     return return_list
 end
 
+local get_starter_items = function()
+    return_list = {}
+    if randomtorio_starting_items then
+        for index, name in pairs(randomtorio_starting_items) do
+            return_list[name] = true
+        end
+    end
+    return return_list
+end
 
 check_function = function(output)
 
@@ -198,7 +247,7 @@ check_function = function(output)
         for name, info in pairs(get_resource_list()) do
             accesiable_recipe_list[name] = info
         end
-        local usable_items = {}
+        local usable_items = get_starter_items() or {}
         local made_packs = {}
         local new_finds = true
         while new_finds do
@@ -217,7 +266,7 @@ check_function = function(output)
                         log(serpent.line(recipe))
                     else
                         for _, result in pairs(recipe.results) do
-                            if not usable_items[result.name] then
+                            if not usable_items[result.name] or (not made_packs[result.name] and science_packs[result.name]) then
                                 usable_items[result.name] = true
                                 new_finds = true
                                 if science_packs[result.name] then
@@ -245,6 +294,9 @@ check_function = function(output)
             completable = false
         else
             log("completable")
+        end
+        if table_size(made_packs) > 0 then
+            log(serpent.line(made_packs))
         end
     end
     return completable

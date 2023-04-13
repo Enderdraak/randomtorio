@@ -29,7 +29,6 @@ if settings.startup["randomtorio-check-possible"].value ~= "disable" then
 end
 
 settings.startup["randomtorio-randomseed"].value = seed
-log(possible(true))
 if possible() then
     log("\n------------------------------------------------------------------------\n                        This is the working seed:\n                        "..seed.."\n------------------------------------------------------------------------")
 else
