@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.1.1
+Date: 17-05-2023
+
+  Changes:
+    - changed so that the recipe outputs are always viseble.
+
+  Locale:
+    - fixed some mod setting locale that was missing
+
+---------------------------------------------------------------------------------------------------
 Version: 0.1.0
 Date: 17-05-2023
 

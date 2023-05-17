@@ -239,7 +239,6 @@ for _, recipe in pairs(data.raw.recipe) do
         set_propper_ingredients(recipe.expensive)
     end
     
-    recipe.always_show_products = true
     set_normal_or_expensive(recipe)
 end
 
@@ -251,10 +250,12 @@ local get_one_type = function()
                 recipe.hidden = true
                 recipe.normal = nil
                 recipe.expensive = nil
+                recipe.always_show_products = true
             else
                 set_normal_or_expensive(recipe, recipe.normal)
                 recipe.normal = nil
                 recipe.expensive = nil
+                recipe.always_show_products = true
             end
         end
     else
@@ -264,10 +265,12 @@ local get_one_type = function()
                 recipe.hidden = true
                 recipe.normal = nil
                 recipe.expensive = nil
+                recipe.always_show_products = true
             else
                 set_normal_or_expensive(recipe, recipe.expensive)
                 recipe.normal = nil
                 recipe.expensive = nil
+                recipe.always_show_products = true
             end
         end
     end
