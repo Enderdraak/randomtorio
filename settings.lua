@@ -10,14 +10,14 @@ data:extend({
         type = "bool-setting",
         name = "randomtorio-results",
         setting_type = "startup",
-        default_value = false,
+        default_value = true,
         order = "a-b"
     },
     {
         type = "int-setting",
         name = "randomtorio-randomseed",
         setting_type = "startup",
-        default_value = 47605,
+        default_value = 1,
         order = "b-a"
     },
     {
@@ -25,7 +25,7 @@ data:extend({
         name = "randomtorio-check-possible",
         setting_type = "startup",
         allowed_values = {"disable", "normal-only", "expensive-only", "normal-and-expensive"},
-        default_value = "disable",
+        default_value = "normal-only",
         order = "c-a"
     },
     {
@@ -33,7 +33,7 @@ data:extend({
         name = "randomtorio-check-amount",
         setting_type = "startup",
         min_value = 1,
-        default_value = 100000,
+        default_value = 100,
         order = "c-b"
     },
     {
