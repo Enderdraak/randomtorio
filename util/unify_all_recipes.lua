@@ -239,5 +239,53 @@ for _, recipe in pairs(data.raw.recipe) do
         set_propper_ingredients(recipe.expensive)
     end
     
+    recipe.always_show_products = true
     set_normal_or_expensive(recipe)
 end
+
+local get_one_type = function()
+    if settings.startup["randomtorio-normal-or-expensive"].value == "normal" then
+        for _, recipe in pairs(data.raw.recipe) do
+            if recipe.normal == false then
+                set_normal_or_expensive(recipe, recipe.expensive)
+                recipe.hidden = true
+                recipe.normal = nil
+                recipe.expensive = nil
+            else
+                set_normal_or_expensive(recipe, recipe.normal)
+                recipe.normal = nil
+                recipe.expensive = nil
+            end
+        end
+    else
+        for _, recipe in pairs(data.raw.recipe) do
+            if recipe.expensive == false then
+                set_normal_or_expensive(recipe, recipe.normal)
+                recipe.hidden = true
+                recipe.normal = nil
+                recipe.expensive = nil
+            else
+                set_normal_or_expensive(recipe, recipe.expensive)
+                recipe.normal = nil
+                recipe.expensive = nil
+            end
+        end
+    end
+    local recipe_list = {}
+    for _, tech in pairs(data.raw.technology) do
+        if tech.effects then
+            for _, effect in pairs(tech.effects) do
+                if effect.type == "unlock-recipe" then
+                    recipe_list[effect.recipe] = true
+                end
+            end
+        end
+    end
+    for _, recipe in pairs(data.raw.recipe) do
+        if not recipe.enabled and not recipe_list[recipe.name] then
+            recipe.hidden = true
+        end
+    end
+end
+
+return get_one_type

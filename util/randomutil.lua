@@ -6,6 +6,7 @@ local lib = {}
 lib.startup = function()
     random_gen = mwc(0)
     random_gen:randomseed(settings.startup["randomtorio-randomseed"].value)
+    log("startup seed: "..settings.startup["randomtorio-randomseed"].value)
 end
 
 lib.random = function(arg1, arg2)
@@ -13,18 +14,20 @@ lib.random = function(arg1, arg2)
         local rand = random_gen:random()
         local random_num = math.floor(arg1 + ((arg2 - arg1) * rand))
         if random_num > arg2 then
-            --log(arg2.."   "..random_num)
             random_num = arg1
         end
         return random_num
     elseif arg1 then
-        local rand = random_gen:random()
-        local random_num = math.floor(arg1 * rand) + 1
-        if random_num > arg1 then
-            --log(arg1.."   "..random_num)
-            random_num = 1
+        if arg1 == 1 then
+            return 1
+        else
+            local rand = random_gen:random()
+            local random_num = math.floor(arg1 * rand) + 1
+            if random_num > arg1 then
+                random_num = 1
+            end
+            return random_num
         end
-        return random_num
     else
         return random_gen:random()
     end

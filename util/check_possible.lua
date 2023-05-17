@@ -2,9 +2,9 @@ local check_function = function()
     return true
 end
 
---if settings.startup["randomtorio-check-possible"].value == "disable" then
---    return check_function
---end
+if settings.startup["randomtorio-check-possible"].value == "disable" then
+    return check_function
+end
 
 local set_propper_results = function(this_needs_fixing, name)
     local results
@@ -34,8 +34,10 @@ local get_enabled_recipes = function(type)
     return enabled_recipes
 end
 
+local resource_list
 local get_resource_list = function()
-    local resource_list = {}
+    if resource_list then return resource_list end
+    resource_list = {}
     for _, resource in pairs(data.raw.resource) do
         set_propper_results(resource.minable, resource.name)
         resource_list["resource-"..resource.name] = {results = resource.minable.results}
@@ -302,4 +304,68 @@ check_function = function(output)
     return completable
 end
 
+
+--[[
+
+--Turns out this idea of prechecking if you can even unlock the packs is slower then just checking everything.
+
+local pack_to_recipe_map
+local get_packs_to_recipe = function()
+    if pack_to_recipe_map then return pack_to_recipe_map end
+    pack_to_recipe_map = {}
+    for pack, _ in pairs(get_science_packs()) do
+        pack_to_recipe_map[pack] = {}
+    end
+    for _, tech in pairs(data.raw.technology) do
+        if tech.effects then
+            for _, effect in pairs(tech.effects) do
+                if effect.type == "unlock-recipe" then
+                    for _, unit in pairs(tech.unit.ingredients) do
+                        pack = unit[1] or unit.name
+                        if get_science_packs()[pack] then
+                            pack_to_recipe_map[pack][effect.recipe] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return pack_to_recipe_map
+end
+
+local check_function_shorts = function(output)
+    local science_packs = get_science_packs()
+    local no_pack_lock = true
+    for _, difficulty in pairs(get_type_list()) do
+        local makable_packs = {}
+        for _, recipe in pairs(data.raw.recipe) do
+            for _, result in pairs(recipe[difficulty].results) do
+                if science_packs[result.name] then
+                    if get_packs_to_recipe()[result.name][recipe.name] == nil then
+                        makable_packs[result.name] = true
+                    end
+                end
+            end
+        end
+        if table_size(makable_packs) ~= table_size(science_packs) then
+            for _, recipe in pairs(get_resource_list()) do
+                for _, result in pairs(recipe.results) do
+                    if science_packs[result.name] then
+                        makable_packs[result.name] = true
+                    end
+                end
+            end
+            if table_size(makable_packs) ~= table_size(science_packs) then
+                return false
+            end
+        end
+    end
+    return check_function()
+end  ]]--
+
+
+--if settings.startup["randomtorio-results"].value then
+--    return check_function
+--else
 return check_function
+--end
