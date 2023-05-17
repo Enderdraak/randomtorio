@@ -18,6 +18,8 @@ local unlock_locked_recipes = function(locked_recipes, avaible_crafting, made_it
             end
             if makeble then 
                 for _, result in pairs(recipe.results) do
+                    log(serpent.line(result))
+                    log(serpent.line(recipe))
                     if not made_items[result.name] then
                         made_items[result.name] = true
                         crafted_items[result.name] = true

@@ -17,9 +17,15 @@ local keep_this_safe = {
 
 
 local set_propper_results = function(this_needs_fixing, name)
-    local results
+    local results = {}
     if this_needs_fixing.results then
-        results = this_needs_fixing.results
+        for _, result in pairs(this_needs_fixing.results) do
+            if result.name then
+                table.insert(results, r_util.deepcopy(result))
+            else
+                table.insert(results, {name = r_util.deepcopy(result[1]), amount = r_util.deepcopy(result[2]), type = "item"})
+            end
+        end
     elseif this_needs_fixing.result then
         if this_needs_fixing.count then
             results = {{type = "item", name = r_util.deepcopy(this_needs_fixing.result), amount = r_util.deepcopy(this_needs_fixing.count)}}
@@ -95,18 +101,22 @@ local get_resource_list = function()
         }
     end
     for _, tree in pairs(data.raw.tree) do
-        set_propper_results(tree.minable, tree.name)
-        keep_this_safe.resources["tree-"..tree.name] = {
-            crafting_category = "tree-mining",
-            results = tree.minable.results,
-        }
+        if tree.minable then
+            set_propper_results(tree.minable, tree.name)
+            keep_this_safe.resources["tree-"..tree.name] = {
+                crafting_category = "tree-mining",
+                results = tree.minable.results,
+            }
+        end
     end
     for _, fish in pairs(data.raw.fish) do
-        set_propper_results(fish.minable, fish.name)
-        keep_this_safe.resources["fish-"..fish.name] = {
-            crafting_category = "fish-mining",
-            results = fish.minable.results,
-        }
+        if fish.minable then
+            set_propper_results(fish.minable, fish.name)
+            keep_this_safe.resources["fish-"..fish.name] = {
+                crafting_category = "fish-mining",
+                results = fish.minable.results,
+            }
+        end
     end
     for _, item in pairs(data.raw.item) do
         if item.burnt_result then
@@ -170,23 +180,25 @@ local get_resource_list = function()
         end
     end
     for _, boiler in pairs(data.raw.boiler) do
-        keep_this_safe.resources["boiler-"..boiler.name] = {
-            crafting_category = boiler.fluid_box.filter.."-"..boiler.output_fluid_box.filter,
-            ingredients = {
-                {
+        if boiler.fluid_box.filter and boiler.output_fluid_box.filter then
+            keep_this_safe.resources["boiler-"..boiler.name] = {
+                crafting_category = boiler.fluid_box.filter.."-"..boiler.output_fluid_box.filter,
+                ingredients = {
+                    {
+                        type = "fluid",
+                        name = boiler.fluid_box.filter,
+                        amount = 1
+                    },
+                },
+                results = {
+                    {
                     type = "fluid",
-                    name = boiler.fluid_box.filter,
+                    name = boiler.output_fluid_box.filter,
                     amount = 1
-                },
-            },
-            results = {
-                {
-                type = "fluid",
-                name = boiler.output_fluid_box.filter,
-                amount = 1
-                },
+                    },
+                }
             }
-        }
+        end
     end
     return r_util.deepcopy(keep_this_safe.resources)
 end
@@ -255,7 +267,7 @@ local get_list_items_that_unlock_categories = function()
                 keep_this_safe.item_to_category[item.name] = keep_this_safe.item_to_category[item.name] or {}
                 table.insert(keep_this_safe.item_to_category[item.name], "offshore-pump-"..data.raw["offshore-pump"][item.place_result].fluid)
             end
-            if data.raw["boiler"][item.place_result] and data.raw["boiler"][item.place_result].fluid_box and data.raw["boiler"][item.place_result].output_fluid_box then
+            if data.raw["boiler"][item.place_result] and data.raw["boiler"][item.place_result].fluid_box and data.raw["boiler"][item.place_result].output_fluid_box and data.raw["boiler"][item.place_result].fluid_box.filter and data.raw["boiler"][item.place_result].output_fluid_box.filter then
                 keep_this_safe.item_to_category[item.name] = keep_this_safe.item_to_category[item.name] or {}
                 table.insert(keep_this_safe.item_to_category[item.name], data.raw["boiler"][item.place_result].fluid_box.filter.."-"..data.raw["boiler"][item.place_result].output_fluid_box.filter)
             end

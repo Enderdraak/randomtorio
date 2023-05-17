@@ -119,7 +119,8 @@ local is_equipment = function(name)
 end
 
 for _, recipe in pairs(data.raw.recipe) do
-    local base_item
+    local base_item = {}
+    
     if recipe.main_product and recipe.main_product ~= "" then
         base_item = get_item_deepcopy(recipe.main_product)
     elseif recipe.normal and recipe.normal.main_product and recipe.normal.main_product ~= "" then
@@ -133,11 +134,23 @@ for _, recipe in pairs(data.raw.recipe) do
     elseif recipe.expensive and recipe.expensive.result then
         base_item = get_item_deepcopy(recipe.expensive.result)
     elseif recipe.results and #recipe.results == 1 then
-        base_item = get_item_deepcopy(recipe.results[1].name)
+        if recipe.results[1].name then
+            base_item = get_item_deepcopy(recipe.results[1].name)
+        else
+            base_item = get_item_deepcopy(recipe.results[1][1])
+        end
     elseif recipe.normal and recipe.normal.results and #recipe.normal.results == 1 then
-        base_item = get_item_deepcopy(recipe.normal.results[1].name)
+        if recipe.normal.results[1].name then
+            base_item = get_item_deepcopy(recipe.normal.results[1].name)
+        else
+            base_item = get_item_deepcopy(recipe.normal.results[1][1])
+        end
     elseif recipe.expensive and recipe.expensive.results and #recipe.expensive.results == 1 then
-        base_item = get_item_deepcopy(recipe.expensive.results[1].name)
+        if recipe.expensive.results[1].name then
+            base_item = get_item_deepcopy(recipe.expensive.results[1].name)
+        else
+            base_item = get_item_deepcopy(recipe.expensive.results[1][1])
+        end
     else
         base_item = get_item_deepcopy(recipe.name)
     end
@@ -158,12 +171,20 @@ for _, recipe in pairs(data.raw.recipe) do
             recipe.icons = get_propper_icons(base_item)
         end
     end
-
+    
     if not recipe.order then
-        recipe.order = base_item.order
+        if base_item == nil then
+            recipe.order ="what-the-fuck-do-you-want????"
+        else
+            recipe.order = base_item.order
+        end
     end
     if not recipe.subgroup then
-        recipe.subgroup = base_item.subgroup
+        if base_item == nil then
+            recipe.subgroup = "what-the-fuck-do-you-want????"
+        else
+            recipe.subgroup = base_item.subgroup
+        end
     end
     if not recipe.localised_name then
         if base_item and recipe.main_product ~= "" then
