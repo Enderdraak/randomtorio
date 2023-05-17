@@ -1,0 +1,9 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.1.0
+Date: 17-05-2023
+
+  Major Features:
+    - Made a new randomizer that makes finding possibilities way faster.
+
+  Minor Features:
+    - detects for power and labs as well.
