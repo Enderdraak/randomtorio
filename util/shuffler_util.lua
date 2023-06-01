@@ -2,6 +2,7 @@ r_util = require("util/randomutil")
 
 local keep_this_safe = {
     recipes = nil,
+    minable = nil,
     resources = nil,
     item_to_category = nil,
     category_to_item = nil,
@@ -66,15 +67,15 @@ local get_starting_recipes = function()
     return r_util.deepcopy(keep_this_safe.starting_recipes)
 end
 
-local get_resource_list = function()
-    if keep_this_safe.resources then return r_util.deepcopy(keep_this_safe.resources) end
-    keep_this_safe.resources = {}
+local get_minable_list = function()
+    if keep_this_safe.minable then return r_util.deepcopy(keep_this_safe.minable) end
+    keep_this_safe.minable = {}
     for _, resource in pairs(data.raw.resource) do
         set_propper_results(resource.minable, resource.name)
-        keep_this_safe.resources["resource-"..resource.name] = {results = resource.minable.results}
-        keep_this_safe.resources["resource-"..resource.name].crafting_category = resource.category or "basic-solid"
+        keep_this_safe.minable["resource-"..resource.name] = {results = resource.minable.results}
+        keep_this_safe.minable["resource-"..resource.name].crafting_category = resource.category or "basic-solid"
         if resource.minable.fluid_amount then
-            keep_this_safe.resources["resource-"..resource.name].ingredients = {
+            keep_this_safe.minable["resource-"..resource.name].ingredients = {
                 {
                 type = "fluid",
                 name = resource.minable.required_fluid,
@@ -82,14 +83,14 @@ local get_resource_list = function()
                 }
             }
             if resource.category then
-                keep_this_safe.resources["resource-"..resource.name].crafting_category = resource.category.."-fluid"
+                keep_this_safe.minable["resource-"..resource.name].crafting_category = resource.category.."-fluid"
             else
-                keep_this_safe.resources["resource-"..resource.name].crafting_category = "basic-solid-fluid"
+                keep_this_safe.minable["resource-"..resource.name].crafting_category = "basic-solid-fluid"
             end
         end
     end
     for _, pump in pairs(data.raw["offshore-pump"]) do
-        keep_this_safe.resources["offshore-pump-"..pump.fluid.."-"..pump.name] = {
+        keep_this_safe.minable["offshore-pump-"..pump.fluid.."-"..pump.name] = {
             crafting_category = "offshore-pump-"..pump.fluid,
             results = {
                 {
@@ -103,7 +104,7 @@ local get_resource_list = function()
     for _, tree in pairs(data.raw.tree) do
         if tree.minable then
             set_propper_results(tree.minable, tree.name)
-            keep_this_safe.resources["tree-"..tree.name] = {
+            keep_this_safe.minable["tree-"..tree.name] = {
                 crafting_category = "tree-mining",
                 results = tree.minable.results,
             }
@@ -112,12 +113,19 @@ local get_resource_list = function()
     for _, fish in pairs(data.raw.fish) do
         if fish.minable then
             set_propper_results(fish.minable, fish.name)
-            keep_this_safe.resources["fish-"..fish.name] = {
+            keep_this_safe.minable["fish-"..fish.name] = {
                 crafting_category = "fish-mining",
                 results = fish.minable.results,
             }
         end
     end
+    return r_util.deepcopy(keep_this_safe.minable)
+end
+
+
+local get_resource_list = function()
+    if keep_this_safe.resources then return r_util.deepcopy(keep_this_safe.resources) end
+    keep_this_safe.resources = get_minable_list()
     for _, item in pairs(data.raw.item) do
         if item.burnt_result then
             keep_this_safe.resources["burn-"..item.name] = {
@@ -461,10 +469,259 @@ local item_to_all_its_crafts = function(item, unused_recipes)
     return keep_this_safe.item_to_category_with_results[item]
 end
 
+local calculate_item_costs = function(made_items, costs, result_name, result_amount, base_resources)
+    --This will calculate the worth of the old and new output and put the lowest of the two in the made_items list
+    if made_items[result_name] then
+        local cost_value = {old = 0, new = 0}
+        for _, value in pairs(costs) do
+            cost_value.new = cost_value.new + value
+        end
+        cost_value.new = cost_value.new/result_amount
+        for _, value in pairs(made_items[result_name]) do
+            cost_value.old = cost_value.old + value
+        end
+        if cost_value.new > cost_value.old then return end
+    end
+    made_items[result_name] = {}
+    for name, value in pairs(costs) do
+        made_items[result_name][name] = value/result_amount
+    end
+    if base_resources[result_name] and not made_items[result_name] then
+        made_items[result_name] = 1
+    end
+    return
+end
+
+local costs_calculator = function()
+    --makes a list of how much each item costs
+
+    local minables = get_minable_list()
+    local resources = get_resource_list()
+    local base_resources = {}
+    local made_items = {}
+
+    --sorts out base resources. Like iron, copper and uranium so that it can display the value of that.
+    for name, resource in pairs(resources) do
+        if minables[name] then
+            if resource.results and not resource.ingredients then
+                for _, result in pairs(resource.results) do
+                    base_resources[result.name] = true
+                    made_items[result.name] = {[result.name] = 1}
+                end
+                resources[name] = nil
+            elseif resource.results then
+                for _, result in pairs(resource.results) do
+                    base_resources[result.name] = true
+                end
+            end
+        end
+    end
+
+    local recipes = util.table.deepcopy(data.raw.recipe)
+
+    --merges the base resource list with the recipe list.
+    for name, resource in pairs(resources) do
+        if not recipes[name] then
+            recipes[name] = resource
+        elseif not recipes["randomtorio-"..name] then
+            recipes["randomtorio-"..name] = resource
+        elseif not recipes["resource-thingy-"..name] then
+            recipes["resource-thingy-"..name] = resource
+        elseif not recipes["resource-collecting-"..name] then
+            recipes["resource-collecting-"..name] = resource
+        elseif not recipes["hw83p29wnscg2a1lp_s-"..name] then
+            recipes["hw83p29wnscg2a1lp_s-"..name] = resource
+        else
+            error("could not merge 2 lists without making conflicts")
+        end
+    end
+
+    --Makes the recipe.amount value a float based on what it truly will give.
+    for _, recipe in pairs(recipes) do
+        if recipe.results then
+            for _, result in pairs(recipe.results) do
+                if not result.amount then
+                    if result.amount_min < result.amount_max then
+                        result.amount = (result.amount_min + result.amount_max) / 2
+                    else
+                        result.amount = result.amount_min
+                    end
+                end                    
+                if result.probability then
+                    result.amount = result.amount * result.probability
+                end
+            end
+        end
+    end
+
+    --loops trhoug the recipes a max of 1 000 000 times and looks during that what items can be made and calculates the cost for that.
+    local loops = 0
+    while table_size(recipes) >= 1 and loops <= 1000000 do
+        loops = loops + 1
+        for recipe_name, recipe in pairs(recipes) do
+            if recipe.hidden then
+                recipes[recipe_name] = nil
+            else
+                if recipe.ingredients then
+                    local makeble = true
+                    local costs = {time = recipe.energy_required or 0}
+                    for _, ingredient in pairs(recipe.ingredients) do
+                        if not made_items[ingredient.name] then
+                            makeble = false
+                            break
+                        else
+                            for name, value in pairs(made_items[ingredient.name]) do
+                                costs[name] = costs[name] or 0
+                                costs[name] = costs[name] + value * ingredient.amount
+                            end
+                        end
+                    end
+                    if makeble then
+                        for _, result in pairs(recipe.results) do
+                            calculate_item_costs(made_items, costs, result.name, result.amount, base_resources)
+                        end
+                        recipes[recipe_name] = nil
+                    end
+                else
+                    local costs = {time = recipe.energy_required or 0}
+                    for _, result in pairs(recipe.results) do
+                        calculate_item_costs(made_items, costs, result.name, result.amount, base_resources)
+                    end
+                    recipes[recipe_name] = nil
+                end
+            end
+        end
+    end
+
+    return made_items
+end
+
+local display_items_layout = function()
+
+    --makes a list of items that need to be displayed.
+    local item_cost = costs_calculator()
+    local items_to_display = {}
+    for name, info in pairs(call_for_science()) do
+        if info.pack or info.item then
+            if item_cost[name] then
+                items_to_display[name] = item_cost[name]
+            end
+        end
+    end
+    for index, name in pairs(r_util.settings_extractor("randomtorio-display-costs")) do 
+        if item_cost[name] then
+            items_to_display[name] = item_cost[name]
+        end
+    end
+
+    --determains what the dimentions of each space needs to be so everything lines up
+    local layout = {num_len = {}, name_size = 0}
+
+    for name, costs in pairs(items_to_display) do
+        name_len = string.len(name)
+        if name_len > layout.name_size then
+            layout.name_size = name_len
+        end
+        for name, cost in pairs(costs) do
+            cost = math.floor(cost * 100 + 0.5) / 100
+            costs[name] = cost
+            num_size = math.floor(math.log(cost,10)) + 1
+            layout.num_len[name] = layout.num_len[name] or 0
+            if num_size > layout.num_len[name] then
+                layout.num_len[name] = num_size
+            end
+        end
+    end
+
+    local stringcompiling = "        Science packs cost:"
+    for name, info in pairs(call_for_science()) do
+        if items_to_display[name] and (info.pack or info.item) then
+            stringcompiling = stringcompiling.."\n            "..string.format("%-"..layout.name_size.."s", name).." needs "
+            for crafting, size in pairs(layout.num_len) do
+                if crafting ~= "time" then
+                    local space = size+3
+                    
+                    if items_to_display[name][crafting] == nil then
+                        stringcompiling = stringcompiling.." "..string.format("%"..space.."s", "").." "..crafting..","
+                    else
+                        stringcompiling = stringcompiling.." "..string.format("%"..space..".2f", items_to_display[name][crafting]).." "..crafting..","
+                    end
+                end
+            end
+            local space = layout.num_len.time+3
+
+            if items_to_display[name].time == nil then
+                stringcompiling = string.sub(stringcompiling, 1, -2).." and "..string.format("%"..space.."s", "").." seconds spend crafting"
+            else
+                stringcompiling = string.sub(stringcompiling, 1, -2).." and "..string.format("%"..space..".2f", items_to_display[name].time).." seconds spend crafting"
+            end
+            items_to_display[name] = nil
+        end
+    end
+
+    if table_size(items_to_display) >= 1 then
+        stringcompiling = stringcompiling.."\n\n        Others cost:"
+        for name, _ in pairs(items_to_display) do
+            stringcompiling = stringcompiling.."\n            "..string.format("%-"..layout.name_size.."s", name).." needs "
+            for crafting, size in pairs(layout.num_len) do
+                if crafting ~= "time" then
+                    local space = size+3
+
+                    if items_to_display[name][crafting] == nil then
+                        stringcompiling = stringcompiling.." "..string.format("%"..space.."s", "").." "..crafting..","
+                    else
+                        stringcompiling = stringcompiling.." "..string.format("%"..space..".2f", items_to_display[name][crafting]).." "..crafting..","
+                    end
+                end
+            end
+            local space = layout.num_len.time+3
+
+            if items_to_display[name].time == nil then
+                stringcompiling = string.sub(stringcompiling, 1, -2).." and "..string.format("%"..space.."s", "").." seconds spend crafting"
+            else
+                stringcompiling = string.sub(stringcompiling, 1, -2).." and "..string.format("%"..space..".2f", items_to_display[name].time).." seconds spend crafting"
+            end
+            items_to_display[name] = nil
+        end
+    end
+
+    return stringcompiling
+end
+
+local setting_info = function()
+    local return_string = "\n\n        Settings:"
+
+    local display_costs = settings.startup["randomtorio-display-costs"].value
+    local no_use = settings.startup["randomtorio-do-not-use"].value
+    local start_with = settings.startup["randomtorio-start-with"].value
+    return_string = return_string.."\n            log items:  "..display_costs
+    return_string = return_string.."\n            Processed:  "..serpent.line(r_util.settings_extractor("randomtorio-display-costs"))
+    return_string = return_string.."\n            no use:     "..no_use
+    return_string = return_string.."\n            Processed:  "..serpent.line(r_util.settings_extractor("randomtorio-do-not-use"))
+    return_string = return_string.."\n            start with: "..start_with
+    return_string = return_string.."\n            Processed:  "..serpent.line(r_util.settings_extractor("randomtorio-start-with"))
+
+    return return_string
+end
+
+local log_seed_info = function(seed, possible)
+    
+    if type(seed) ~= "number" then
+        log("\n------------------------------------------------------------------------\n   The calculated costs without randomizing:\n\n"..display_items_layout()..setting_info().."\n------------------------------------------------------------------------")
+    else
+        if possible then
+            log("\n------------------------------------------------------------------------\n   The calculated costs for seed, you can play it: "..seed.."\n\n"..display_items_layout().."\n------------------------------------------------------------------------")
+        else
+            log("\n------------------------------------------------------------------------\n   No costs are calulated for the incompletable seed: "..seed.."\n------------------------------------------------------------------------")
+        end
+    end
+end
+    
 local functions = {
     set_propper_results = set_propper_results,
     get_fresh_recipe_copy = get_fresh_recipe_copy,
     get_starting_recipes = get_starting_recipes,
+    get_minable_list = get_minable_list,
     get_resource_list = get_resource_list,
     powerpoles = powerpoles,
     get_fuel_category_to_items = get_fuel_category_to_items,
@@ -475,6 +732,8 @@ local functions = {
     get_lab_list = get_lab_list,
     call_for_science = call_for_science,
     item_to_all_its_crafts = item_to_all_its_crafts,
+    costs_calculator = costs_calculator,
+    log_seed_info = log_seed_info,
 }
 
 return functions

@@ -18,8 +18,6 @@ local unlock_locked_recipes = function(locked_recipes, avaible_crafting, made_it
             end
             if makeble then 
                 for _, result in pairs(recipe.results) do
-                    log(serpent.line(result))
-                    log(serpent.line(recipe))
                     if not made_items[result.name] then
                         made_items[result.name] = true
                         crafted_items[result.name] = true
@@ -71,6 +69,7 @@ local required_items_store
 local science
 local items_to_recipes
 local picked_energy_paths
+local energy_type_for_item
 local storage_function_reset = function()
     science = {
         lab = {},
@@ -89,9 +88,11 @@ local storage_function_reset = function()
         items = {},
         energy = {},
         results = {},
+        early = {},
     }
     items_to_recipes = {}
     picked_energy_paths = {}
+    energy_type_for_item = {}
 end
 
 local science_unlock = function(item, energy_types, researched_recipes)
@@ -160,7 +161,7 @@ local science_unlock = function(item, energy_types, researched_recipes)
         end
     end
     if table_size(new_to_research) >= 1 then
-        log("unlocking techs of:  "..serpent.line(new_to_research))
+        --log("unlocking techs of:  "..serpent.line(new_to_research))
         for _, tech in pairs(data.raw.technology) do
             local is_new = false
             local researchable = true
@@ -193,7 +194,7 @@ local science_unlock = function(item, energy_types, researched_recipes)
     return unlock_new
 end
 
-local get_energy_type = function(item)
+local get_all_energy_types = function(item)
     local place_result
     if data.raw.item[item] then
         if data.raw.item[item].place_result then
@@ -212,16 +213,47 @@ local get_energy_type = function(item)
                     end
                 end
                 if energy_source == nil then return nil end
-                if energy_source.type == "burner" then return energy_source.fuel_category end
-                if energy_source.type then return energy_source.type end
+                local energies = {}
+                if energy_source.type == "burner" then 
+                    if energy_source.fuel_categories then
+                        energies = energy_source.fuel_categories
+                    else
+                    table.insert(energies, energy_source.fuel_category)
+                    end
+                end
+                if energy_source.type ~= "burner" then table.insert(energies, energy_source.type) end
+                return energies
             end
         end
     end
 end
 
+local get_a_energy_type = function(item)
+    if energy_type_for_item[item] then return energy_type_for_item[item] end
+    local energies = get_all_energy_types(item)
+    if energies then
+        energy_type_for_item[item] = energies[r_util.random(#energies)]
+    end
+    return energy_type_for_item[item]
+end
+
+
+local has_power = function(item, energy_types)
+    local energies = get_all_energy_types(item)
+    if energies then
+        for _, fuel in pairs(energies) do
+            if energy_types[fuel] then
+                return true
+            end
+        end
+        return false
+    end
+    return true
+end
+
 
 local item_to_crafts
-item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types, made_items)
+item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types, made_items, logs)
     local return_list = {
         energy = {},
         results = {},
@@ -235,8 +267,8 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
             return_list.results[items_to_recipes[item].category] = return_list.results[items_to_recipes[item].category] or {}
             table.insert(return_list.results[items_to_recipes[item].category], items_to_recipes[item].results)
         end
-        if get_energy_type(item) and not energy_types[get_energy_type(item)] then
-            energies_to_make[get_energy_type(item)] = true
+        if not has_power(item, energy_types) then
+            energies_to_make[get_a_energy_type(item)] = true
         end
     end
     local list_to_make_more = {}
@@ -255,18 +287,25 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
         more_items[items_to_recipes[category]] = true
     end
 
+    if logs then
+        log("doing this thing  "..serpent.line(return_list))
+    end
+
     local power_already = r_util.deepcopy(energy_types)
     for energy, _ in pairs(energies_to_make) do
         power_already[energy] = true
         if not picked_energy_paths[energy] then
             local power
+            if logs then
+                log("this should be nil:  "..serpent.line(power))
+            end
             if energy == "electric" then
-                power = randomtorio_power_generation[r_util.random(#randomtorio_power_generation)]
+                power = r_util.deepcopy(randomtorio_power_generation[r_util.random(#randomtorio_power_generation)])
                 if not s_util.powerpoles(made_items) then
                     table.insert(power, s_util.powerpoles()[r_util.random(#s_util.powerpoles())])
                 end
             elseif energy == "heat" then
-                power = randomtorio_heat_generation[r_util.random(#randomtorio_heat_generation)]
+                power = r_util.deepcopy(randomtorio_heat_generation[r_util.random(#randomtorio_heat_generation)])
             else
                 power = {s_util.get_fuel_category_to_items()[energy][r_util.random(#s_util.get_fuel_category_to_items()[energy])]}
             end
@@ -283,7 +322,7 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
         for item, _ in pairs(items) do
             crafted_items[item] = true
         end
-        for name, group in pairs(item_to_crafts(more_items, already_avaiable, unused_recipes, power_already, crafted_items)) do
+        for name, group in pairs(item_to_crafts(more_items, already_avaiable, unused_recipes, power_already, crafted_items, logs)) do
             for category, crafts in pairs(group) do
                 for _, craft in pairs(crafts) do
                     return_list[name][category] = return_list[name][category] or {}
@@ -292,31 +331,41 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
             end
         end
     end
+    if logs then
+        log("doing this thing plek 2 "..serpent.line(return_list))
+    end
     return return_list
 end
 
 
-local get_required_items = function(energy_types, made_items, avaible_crafting, unused_recipes)
+local get_required_items = function(energy_types, made_items, avaible_crafting, unused_recipes, logs)
     
+    if logs then
+        log("what is left  "..serpent.line(required_items_store))
+    end
+
+    --detect if the current stored list will be enough.
     local good_to_go = true
-    if table_size(required_items_store.results) >= 1 then
+    if table_size(required_items_store.results) >= 1 then --check if there is at least 1 item to be made
         for item, _ in pairs(required_items_store.items) do
             if made_items[item] then
                 if s_util.call_for_science()[item] then
                     if s_util.call_for_science()[item].pack or s_util.call_for_science()[item].item then
-                        good_to_go = false
+                        good_to_go = false --if a science pack has been made get a new one
                     end
                 end
                 required_items_store.items[item] = nil
             end
         end
-        for item, goal in pairs(items_to_recipes) do
+
+        --check if an item has been made that is stored as a crafting recipe.
+        for item, goal in pairs(items_to_recipes) do 
             if made_items[item] then
                 for category, list in pairs(required_items_store.results) do
                     for index, result in pairs(list) do
                         if table.compare(result, goal.results) then
                             --log("this was crafted: "..serpent.line(table.remove(required_items_store.results[category], index)))
-                            table.remove(required_items_store.results[category], index)
+                            table.remove(required_items_store.results[category], index) --remove the results from an item that has been crafted.
                             if table_size(required_items_store.results[category]) == 0 then
                                 required_items_store.results[category] = nil
                                 if table_size(required_items_store.results) == 0 then
@@ -328,17 +377,19 @@ local get_required_items = function(energy_types, made_items, avaible_crafting, 
                 end
             end
         end
+
+        --check if an energy type has been made
         for energy, list in pairs(required_items_store.energy) do
             if energy_types[energy] then
                 for _, items in pairs(list) do
                     for category, list in pairs(required_items_store.results) do
                         for index, result in pairs(list) do
                             if table.compare(result, items_to_recipes[items]) then
-                                table.remove(required_items_store.results[category], index)
+                                table.remove(required_items_store.results[category], index) --remove the energy from that list.
                                 if table_size(required_items_store.results[category]) == 0 then
                                     required_items_store.results[category] = nil
                                     if table_size(required_items_store.results) == 0 then
-                                        good_to_go = false
+                                        good_to_go = false --if no more things are in the list then get a new list.
                                     end
                                 end
                             end
@@ -361,7 +412,7 @@ local get_required_items = function(energy_types, made_items, avaible_crafting, 
                 end
             end
         end
-        if finished then return {} end
+        if finished then return {} end --return an empty list if all science packs have been made.
     end
 
     local left_over_packs = {}
@@ -375,6 +426,17 @@ local get_required_items = function(energy_types, made_items, avaible_crafting, 
     for _, pack in pairs(next_packs) do
         if left_over_packs[pack] then
             table.insert(packs_by_index, pack)
+        end
+    end
+
+    if table_size(required_items_store.early) == 0 then
+        for _, list in pairs(r_util.settings_extractor("randomtorio-start-with")) do
+            local name = list
+            if type(list) ~= "string" then
+                name = list[r_util.random(table_size(list))]
+            end
+            required_items_store.items[name] = true
+            required_items_store.early[name] = true
         end
     end
 
@@ -474,7 +536,11 @@ local get_required_items = function(energy_types, made_items, avaible_crafting, 
         end
     end
 
-    items_to_craft_list = item_to_crafts(required_items_store.items, avaible_crafting, unused_recipes, energy_types, made_items)
+    local items_to_craft_list = item_to_crafts(required_items_store.items, avaible_crafting, unused_recipes, energy_types, made_items, logs)
+
+    if logs then
+        log("items that need to be crafted:  "..serpent.line(items_to_craft_list))
+    end
 
     for place, list in pairs(items_to_craft_list) do
         for category, objects in pairs(list) do
@@ -527,9 +593,7 @@ local get_list_of_items_that_open_possibilities = function(rand_ingredients, unu
             if items_that_could_be_made[item] then
                 for _, category in pairs(s_util.get_list_items_that_unlock_categories()[item]) do
                     if not avaible_crafting[category] then
-                        if not get_energy_type(item) then
-                            items_that_open_possibilities[item] = true
-                        elseif energy_types[get_energy_type(item)] then
+                        if has_power(item, energy_types) then
                             items_that_open_possibilities[item] = true
                         end
                         break
@@ -584,7 +648,11 @@ end
 local unlock_power = function(made_items, energy_types, avaible_crafting, powerless_machines, result)
     local unlock_new = false
     if data.raw.item[result] then
-        if data.raw.item[result].fuel_category then
+        if data.raw.item[result].fuel_categories then
+            for _, fuel in pairs(data.raw.item[result].fuel_categories) do
+                unlock_new = unlock_powerless_machines(fuel, energy_types, avaible_crafting, powerless_machines) or unlock_new
+            end
+        else if data.raw.item[result].fuel_category then
             unlock_new = unlock_powerless_machines(data.raw.item[result].fuel_category, energy_types, avaible_crafting, powerless_machines) or unlock_new
         end
     end
@@ -599,7 +667,7 @@ local unlock_power = function(made_items, energy_types, avaible_crafting, powerl
                     end
                 end
                 if buildable then
-                    log("power came online!!!")
+                    --log("power came online!!!")
                     unlock_new = unlock_powerless_machines("electric", energy_types, avaible_crafting, powerless_machines) or unlock_new
                 end
             end
@@ -615,7 +683,7 @@ local unlock_power = function(made_items, energy_types, avaible_crafting, powerl
                 end
             end
             if buildable then
-                unlock_new = unlock_powerless_machines("electric", energy_types, avaible_crafting, powerless_machines) or unlock_new
+                unlock_new = unlock_powerless_machines("heat", energy_types, avaible_crafting, powerless_machines) or unlock_new
             end
         end
     end
@@ -625,48 +693,21 @@ end
 local unlock_categories = function(result, energy_types, avaible_crafting, powerless_machines)
     local unlock_new = false
     if s_util.get_list_items_that_unlock_categories()[result] then
-        local place_result
-        for _, places in pairs({"assembling-machine","reactor","furnace","boiler","rocket-silo","boiler","burner-generator","offshore-pump","lab","mining-drill"}) do
-            if data.raw[places][data.raw.item[result].place_result] then
-                place_result = data.raw[places][data.raw.item[result].place_result]
-                break
-            end
-        end
-        if place_result then
-            local energy_source
-            for _, places in pairs({"burner","energy_source"}) do
-                if place_result[places] then
-                    energy_source = place_result[places]
-                    break
-                end
-            end
-            if energy_source then
-                local energy_type
-                if energy_source.type then energy_type = energy_source.type end
-                if energy_source.type == "burner" then energy_type = energy_source.fuel_category end
-                if energy_types[energy_type] then
-                    for _, category in pairs(s_util.get_list_items_that_unlock_categories()[result]) do
-                        avaible_crafting[category] = true
-                    end
-                else
-                    powerless_machines[energy_type] = powerless_machines[energy_type] or {}
-                    table.insert(powerless_machines[energy_type], result)
-                end
-            else
-                for _, category in pairs(s_util.get_list_items_that_unlock_categories()[result]) do
-                    avaible_crafting[category] = true
-                end
-            end
-        else
+        if has_power(result,energy_types) then
             for _, category in pairs(s_util.get_list_items_that_unlock_categories()[result]) do
                 avaible_crafting[category] = true
+            end
+        else
+            for _, fuel in pairs(get_all_energy_types(result)) do
+                powerless_machines[fuel] = powerless_machines[fuel] or {}
+                table.insert(powerless_machines[fuel], result)
             end
         end
     end
 end
 
 local functions = {}
-functions.run = function()
+functions.run = function(logs)
 
     local energy_types = {["heat"] = false, ["electric"] = false}
     local powerless_machines = {["heat"] = {}, ["electric"] = {}}
@@ -679,7 +720,7 @@ functions.run = function()
     
     storage_function_reset()
 
-    local required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes)
+    local required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes, logs)
 
     unlock_locked_recipes(locked_recipes, avaible_crafting, made_items)
     new_stuff(unused_recipes, ingredients_to_pick, avaible_crafting, made_items)
@@ -693,8 +734,11 @@ functions.run = function()
 
     while #ingredients_to_pick >= 1 do
 
-        required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes)
+        required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes, logs)
 
+        if logs then
+            log("required items:  "..serpent.line(required_items))
+        end
         if nothing_left(ingredients_to_pick, avaible_crafting, researched_recipes) then
             break
         end
@@ -749,6 +793,10 @@ functions.run = function()
 
         data.raw.recipe[rand_recipe].ingredients = rand_ingredients.ingredients
         data.raw.recipe[rand_recipe].results = rand_result
+
+        if logs then
+            log("Recipe "..rand_recipe.." contains:  "..serpent.line(data.raw.recipe[rand_recipe]))
+        end
         
         local unlock_new = false
         for _, result in pairs(rand_result) do
@@ -788,23 +836,67 @@ functions.startup = function()
 end
 
 functions.multiruns = function()
-    if settings.startup["randomtorio-first-randomizer"].value == false then
-        functions.startup()
-        local count = 0
-        local seed = settings.startup["randomtorio-randomseed"].value
-        local possible = functions.run()
-        while not possible and count < settings.startup["randomtorio-check-amount"].value do
-            count = count + 1
-            seed = seed + 1
-            r_util.seed(seed)
+    logseeds = {
+        --53 = true,
+    }
+
+    functions.startup()
+    local count = 0
+    local seed = settings.startup["randomtorio-randomseed"].value
+    local items_should_not_cost = {items = {}, cost = r_util.settings_extractor("randomtorio-do-not-use")}     
+    for name, info in pairs(s_util.call_for_science()) do
+        if info.pack or info.item then
+            items_should_not_cost.items[name] = true
+        end
+    end
+    if settings.startup["randomtorio-force-restriction"].value then
+        for index, name in pairs(r_util.settings_extractor("randomtorio-display-costs")) do 
+            items_should_not_cost.items[name] = true
+        end
+    end
+
+    s_util.log_seed_info("startup")
+
+    local possible 
+    if logseeds[seed] then
+        possible = functions.run(true)
+    else
+        possible = functions.run()
+    end
+    while not possible and count < settings.startup["randomtorio-check-amount"].value do
+        count = count + 1
+        seed = seed + 1
+        r_util.seed(seed)
+
+        if count % settings.startup["randomtorio-log-seed-gap"].value == 0 then
+            log("current seed is: "..seed)
+        end
+        if logseeds[seed] then
+            possible = functions.run(true)
+        else
             possible = functions.run()
         end
         if possible then
-            log("\n------------------------------------------------------------------------\n                        This is the working seed:\n                        "..seed.."\n------------------------------------------------------------------------")
-        else
-            log("\n------------------------------------------------------------------------\n              This is the current seed, it is not completable:\n                        "..seed.."\n------------------------------------------------------------------------")
+            local cost_list = s_util.costs_calculator()
+            for name, _ in pairs(items_should_not_cost.items) do
+                for _, item in pairs(items_should_not_cost.cost) do
+                    if cost_list[name] and cost_list[name][item] then
+                        possible = false
+                        break
+                    end
+                end
+                if possible == false then
+                    break
+                end
+            end
         end
+        if possible and settings.startup["randomtorio-keep-on-looking"].value then
+            s_util.log_seed_info(seed, true)
+            possible = false
+        end            
     end
+        
+    s_util.log_seed_info(seed, possible)
 end
 
 return functions

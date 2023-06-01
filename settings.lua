@@ -1,32 +1,10 @@
 data:extend({
     {
-        type = "bool-setting",
-        name = "randomtorio-ingredients",
-        setting_type = "startup",
-        default_value = true,
-        order = "a-a"
-    },
-    {
-        type = "bool-setting",
-        name = "randomtorio-results",
-        setting_type = "startup",
-        default_value = true,
-        order = "a-b"
-    },
-    {
         type = "int-setting",
         name = "randomtorio-randomseed",
         setting_type = "startup",
         default_value = 1,
-        order = "b-a"
-    },
-    {
-        type = "string-setting",
-        name = "randomtorio-check-possible",
-        setting_type = "startup",
-        allowed_values = {"disable", "normal-only", "expensive-only", "normal-and-expensive"},
-        default_value = "normal-only",
-        order = "c-a"
+        order = "a-a"
     },
     {
         type = "int-setting",
@@ -34,14 +12,22 @@ data:extend({
         setting_type = "startup",
         min_value = 1,
         default_value = 100,
-        order = "c-b"
+        order = "b-a"
+    },
+    {
+        type = "int-setting",
+        name = "randomtorio-log-seed-gap",
+        setting_type = "startup",
+        min_value = 1,
+        default_value = 1,
+        order = "b-b"
     },
     {
         type = "bool-setting",
-        name = "randomtorio-first-randomizer",
+        name = "randomtorio-keep-on-looking",
         setting_type = "startup",
         default_value = false,
-        order = "c-c"
+        order = "b-c"
     },
     {
         type = "string-setting",
@@ -50,5 +36,33 @@ data:extend({
         allowed_values = {"normal", "expensive"},
         default_value = "normal",
         order = "c-d"
+    },
+    {
+        type = "string-setting",
+        name = "randomtorio-display-costs",
+        setting_type = "startup",
+        default_value = "[item=transport-belt][item=fast-transport-belt][item=express-transport-belt][item=underground-belt][item=fast-underground-belt][item=express-underground-belt][item=splitter][item=fast-splitter][item=express-splitter][item=inserter][item=long-handed-inserter][item=fast-inserter][item=filter-inserter][item=stack-inserter][item=stack-filter-inserter]",
+        order = "d-a"
+    },
+    {
+        type = "bool-setting",
+        name = "randomtorio-force-restriction",
+        setting_type = "startup",
+        default_value = false,
+        order = "d-b"
+    },
+    {
+        type = "string-setting",
+        name = "randomtorio-do-not-use",
+        setting_type = "startup",
+        default_value = "[item=wood][item=raw-fish]",
+        order = "d-c"
+    },
+    {
+        type = "string-setting",
+        name = "randomtorio-start-with",
+        setting_type = "startup",
+        default_value = "{[item=stone-furnace][item=steel-furnace][item=electric-furnace]}{[item=burner-mining-drill][item=electric-mining-drill]}{[item=transport-belt][item=fast-transport-belt][item=express-transport-belt]}",
+        order = "d-c"
     },
 })

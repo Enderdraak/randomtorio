@@ -65,7 +65,7 @@ local set_normal_or_expensive = function(recieve, giveth)
     end
 
     recieve.enabled = give.enabled
-    recieve.energy_required = give.energy_required
+    recieve.energy_required = give.energy_required or 0.5
     recieve.emissions_multiplier = give.emissions_multiplier
     recieve.requester_paste_multiplier = give.requester_paste_multiplier
     recieve.overload_multiplier = give.overload_multiplier

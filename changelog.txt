@@ -1,4 +1,26 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.1.2
+Date: 01-06-2023
+
+
+  Fixes:
+    - fixed a bleed over effect in which more then one power pole got added if multiple other seeds came before it (might break your seed, be warned.)
+    - fixed an issue that it could not handle fuel_categories as a power input. As well as items with that.
+
+  Settings:
+    - removed settings that no longer did anything
+    - added a setting to force some items to be craftiable before the first science pack
+    - added a setting so you can log more items and what they cost
+    - added a setting that allows you to ignore seeds that take specific items in the crafting of science packs. By default that is wood and fish.
+
+  Changes:
+    - Used a sledge hammer and a broom to remove the old way of randomizing and settings related to that.
+    - the log file contains an estimation of the cost of each science pack
+
+  Locale:
+    - removed text no longer in use.
+    - removed outdated info.
+---------------------------------------------------------------------------------------------------
 Version: 0.1.1
 Date: 17-05-2023
 
