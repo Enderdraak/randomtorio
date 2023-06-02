@@ -3,7 +3,7 @@ data:extend({
         type = "int-setting",
         name = "randomtorio-randomseed",
         setting_type = "startup",
-        default_value = 1,
+        default_value = 925,
         order = "a-a"
     },
     {
@@ -36,6 +36,13 @@ data:extend({
         allowed_values = {"normal", "expensive"},
         default_value = "normal",
         order = "c-d"
+    },
+    {
+        type = "bool-setting",
+        name = "randomtorio-keep-icon-with-result",
+        setting_type = "startup",
+        default_value = true,
+        order = "c-e"
     },
     {
         type = "string-setting",

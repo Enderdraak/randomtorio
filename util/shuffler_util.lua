@@ -14,6 +14,7 @@ local keep_this_safe = {
     powerpoles = nil,
     fuel_category_to_items = nil,
     item_to_category_with_results = {},
+    results_icon = nil,
 }
 
 
@@ -469,6 +470,32 @@ local item_to_all_its_crafts = function(item, unused_recipes)
     return keep_this_safe.item_to_category_with_results[item]
 end
 
+local result_to_icon_store = function()
+    if keep_this_safe.result_icon then return end
+    keep_this_safe.result_icon = {}
+    for name, recipe in pairs(data.raw.recipe) do
+        keep_this_safe.result_icon[name] = {
+            icons = r_util.deepcopy(recipe.icons),
+            results = r_util.deepcopy(recipe.results),
+        }
+    end
+end
+
+local result_to_icon_write = function()
+    local result_icon = r_util.deepcopy(keep_this_safe.result_icon)
+    for name, recipe in pairs(data.raw.recipe) do
+        local storage_name
+        for name2, recipe2 in pairs(result_icon) do
+            if table.compare(recipe.results, recipe2.results) then
+                recipe.icons = recipe2.icons
+                storage_name = name2
+                break
+            end
+        end
+        result_icon[storage_name] = nil
+    end
+end
+
 local calculate_item_costs = function(made_items, costs, result_name, result_amount, base_resources)
     --This will calculate the worth of the old and new output and put the lowest of the two in the made_items list
     if made_items[result_name] then
@@ -732,6 +759,8 @@ local functions = {
     get_lab_list = get_lab_list,
     call_for_science = call_for_science,
     item_to_all_its_crafts = item_to_all_its_crafts,
+    result_to_icon_store = result_to_icon_store,
+    result_to_icon_write = result_to_icon_write,
     costs_calculator = costs_calculator,
     log_seed_info = log_seed_info,
 }

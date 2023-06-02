@@ -12,6 +12,7 @@ Date: 01-06-2023
     - added a setting to force some items to be craftiable before the first science pack
     - added a setting so you can log more items and what they cost
     - added a setting that allows you to ignore seeds that take specific items in the crafting of science packs. By default that is wood and fish.
+    - You can keep the icon with the result it made origionally
 
   Changes:
     - Used a sledge hammer and a broom to remove the old way of randomizing and settings related to that.

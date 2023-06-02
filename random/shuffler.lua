@@ -652,7 +652,7 @@ local unlock_power = function(made_items, energy_types, avaible_crafting, powerl
             for _, fuel in pairs(data.raw.item[result].fuel_categories) do
                 unlock_new = unlock_powerless_machines(fuel, energy_types, avaible_crafting, powerless_machines) or unlock_new
             end
-        else if data.raw.item[result].fuel_category then
+        elseif data.raw.item[result].fuel_category then
             unlock_new = unlock_powerless_machines(data.raw.item[result].fuel_category, energy_types, avaible_crafting, powerless_machines) or unlock_new
         end
     end
@@ -854,6 +854,9 @@ functions.multiruns = function()
             items_should_not_cost.items[name] = true
         end
     end
+    if settings.startup["randomtorio-keep-icon-with-result"].value then
+        s_util.result_to_icon_store()
+    end
 
     s_util.log_seed_info("startup")
 
@@ -894,6 +897,11 @@ functions.multiruns = function()
             s_util.log_seed_info(seed, true)
             possible = false
         end            
+    end
+
+    
+    if settings.startup["randomtorio-keep-icon-with-result"].value then
+        s_util.result_to_icon_write()
     end
         
     s_util.log_seed_info(seed, possible)
