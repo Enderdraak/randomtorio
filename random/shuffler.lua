@@ -724,7 +724,11 @@ functions.run = function(logs)
     new_stuff(unused_recipes, ingredients_to_pick, avaible_crafting, made_items)
     for item, _ in pairs(made_items) do
         if data.raw.item[item] then
-            if data.raw.item[item].fuel_category then
+            if data.raw.item[item].fuel_categories then
+                for _, fuel in pairs(data.raw.item[item].fuel_categories) do
+                    energy_types[fuel] = true
+                end
+            elseif data.raw.item[item].fuel_category then
                 energy_types[data.raw.item[item].fuel_category] = true
             end
         end

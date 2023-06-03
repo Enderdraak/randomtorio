@@ -120,6 +120,7 @@ local get_minable_list = function()
             }
         end
     end
+    --include rocks
     return r_util.deepcopy(keep_this_safe.minable)
 end
 
