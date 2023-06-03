@@ -2,8 +2,6 @@ r_util = require("util/randomutil")
 
 s_util = require("util/shuffler_util")
 
-cleanup = require("util/unify_all_recipes")
-
 local unlock_locked_recipes = function(locked_recipes, avaible_crafting, made_items)
     local crafted_items = {}
     for name, recipe in pairs(locked_recipes) do
@@ -832,7 +830,6 @@ end
 
 functions.startup = function()
     r_util.startup()
-    cleanup()
 end
 
 functions.multiruns = function()
