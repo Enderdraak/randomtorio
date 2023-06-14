@@ -1,3 +1,5 @@
+r_util = require("util/randomutil")
+
 local list_of_item_places = {}
 for _, list in pairs({defines.prototypes.item,defines.prototypes.fluid}) do
     for place, _ in pairs(list) do
@@ -59,34 +61,32 @@ local get_propper_icons = function(prototype)
 end
 
 local set_normal_or_expensive = function(recieve, giveth)
-    local give = {}
-    if giveth then
-        give = r_util.deepcopy(giveth)
-    end
 
-    recieve.enabled = give.enabled
-    recieve.energy_required = give.energy_required or 0.5
-    recieve.emissions_multiplier = give.emissions_multiplier
-    recieve.requester_paste_multiplier = give.requester_paste_multiplier
-    recieve.overload_multiplier = give.overload_multiplier
-    recieve.allow_inserter_overload = give.allow_inserter_overload
-    recieve.hidden = give.hidden
-    recieve.hide_from_stats = give.hide_from_stats
-    recieve.hide_from_player_crafting = give.hide_from_player_crafting
-    recieve.allow_decomposition = give.allow_decomposition
-    recieve.allow_as_intermediate = give.allow_as_intermediate
-    recieve.allow_intermediates = give.allow_intermediates
-    recieve.always_show_made_in = give.always_show_made_in
-    recieve.show_amount_in_title = give.show_amount_in_title
-    recieve.always_show_products = give.always_show_products
-    recieve.unlock_results = give.unlock_results
-    recieve.main_product = give.main_product
+    local give = r_util.deepcopy(giveth)
 
-    recieve.results = give.results
-    recieve.result = give.result
-    recieve.result_count = give.result_count 
+    recieve.enabled = give.enabled or recieve.enabled
+    recieve.energy_required = give.energy_required or recieve.energy_required or 0.5
+    recieve.emissions_multiplier = give.emissions_multiplier or recieve.emissions_multiplier
+    recieve.requester_paste_multiplier = give.requester_paste_multiplier or recieve.requester_paste_multiplier
+    recieve.overload_multiplier = give.overload_multiplier or recieve.overload_multiplier
+    recieve.allow_inserter_overload = give.allow_inserter_overload or recieve.allow_inserter_overload
+    recieve.hidden = give.hidden or recieve.hidden
+    recieve.hide_from_stats = give.hide_from_stats or recieve.hide_from_stats
+    recieve.hide_from_player_crafting = give.hide_from_player_crafting or recieve.hide_from_player_crafting
+    recieve.allow_decomposition = give.allow_decomposition or recieve.allow_decomposition
+    recieve.allow_as_intermediate = give.allow_as_intermediate or recieve.allow_as_intermediate
+    recieve.allow_intermediates = give.allow_intermediates or recieve.allow_intermediates
+    recieve.always_show_made_in = give.always_show_made_in or recieve.always_show_made_in
+    recieve.show_amount_in_title = give.show_amount_in_title or recieve.show_amount_in_title
+    recieve.always_show_products = give.always_show_products or recieve.always_show_products
+    recieve.unlock_results = give.unlock_results or recieve.unlock_results
+    recieve.main_product = give.main_product or recieve.main_product
 
-    recieve.ingredients = give.ingredients
+    recieve.results = give.results or recieve.results
+    recieve.result = give.result or recieve.result
+    recieve.result_count = give.result_count or recieve.result_count 
+
+    recieve.ingredients = give.ingredients or recieve.ingredients
 
 end
 
@@ -118,7 +118,7 @@ local is_equipment = function(name)
     end
 end
 
-local set_recipe = function(recipe)
+local set_recipe = function(recipe, difficulty)
     local base_item = {}
     
     if recipe.main_product and recipe.main_product ~= "" then
@@ -223,46 +223,57 @@ local set_recipe = function(recipe)
         end
     end
 
-    if recipe.normal == nil and recipe.expensive == nil then
-        recipe.normal = {}
-        recipe.expensive = {}
+    if recipe.normal == false and difficulty == "normal" then
+        if recipe.expensive then
+            set_normal_or_expensive(recipe, recipe.expensive)
+        end
+        recipe.normal = nil
+        recipe.expensive = nil
+        recipe.hidden = true
+    elseif recipe.expensive == false and difficulty == "expensive" then
+        if recipe.normal then
+            set_normal_or_expensive(recipe, recipe.normal)
+        end
+        recipe.normal = nil
+        recipe.expensive = nil
+        recipe.hidden = true
+    elseif recipe.normal == nil and recipe.expensive == nil then
         if recipe.enabled == nil then
             recipe.enabled = true
         end
-        set_normal_or_expensive(recipe.normal, recipe)
-        set_normal_or_expensive(recipe.expensive, recipe)
     elseif recipe.normal == nil then
-        recipe.normal = {}
         if recipe.expensive.enabled == nil then
             recipe.expensive.enabled = true
         end
-        set_normal_or_expensive(recipe.normal, recipe.expensive)
+        set_normal_or_expensive(recipe, recipe.expensive)
+        recipe.expensive = nil
     elseif recipe.expensive == nil then
-        recipe.expensive = {}
         if recipe.normal.enabled == nil then
             recipe.normal.enabled = true
         end
-        set_normal_or_expensive(recipe.expensive, recipe.normal)
+        set_normal_or_expensive(recipe, recipe.normal)
+        recipe.normal = nil
     else
-        if recipe.normal.enabled == nil then
-            recipe.normal.enabled = true
+        if difficulty == "normal" then
+            if recipe.normal.enabled == nil then
+                recipe.normal.enabled = true
+            end
+            set_normal_or_expensive(recipe, recipe.normal)
+            recipe.normal = nil
+            recipe.expensive = nil
         end
-        if recipe.expensive.enabled == nil then
-            recipe.expensive.enabled = true
+        if difficulty == "expensive" then
+            if recipe.expensive.enabled == nil then
+                recipe.expensive.enabled = true
+            end
+            set_normal_or_expensive(recipe, recipe.expensive)
+            recipe.normal = nil
+            recipe.expensive = nil
         end
     end
-    if recipe.normal then
-        set_propper_results(recipe.normal, recipe.name)
-        set_propper_ingredients(recipe.normal)
-    end 
-    if recipe.expensive then
-        set_propper_results(recipe.expensive, recipe.name)
-        set_propper_ingredients(recipe.expensive)
-    end
-    
+    set_propper_results(recipe, recipe.name)
+    set_propper_ingredients(recipe)
     recipe.always_show_products = true
-    
-    set_normal_or_expensive(recipe)
 end
 
 local recipe_list = {}
@@ -276,38 +287,9 @@ for _, tech in pairs(data.raw.technology) do
     end
 end
 
-if settings.startup["randomtorio-normal-or-expensive"].value == "normal" then
-    for _, recipe in pairs(data.raw.recipe) do
-        set_recipe(recipe)
-        if not recipe.enabled and not recipe_list[recipe.name] then
-            recipe.hidden = true
-        end
-        if recipe.normal == false then
-            set_normal_or_expensive(recipe, recipe.expensive)
-            recipe.hidden = true
-            recipe.normal = nil
-            recipe.expensive = nil
-        else
-            set_normal_or_expensive(recipe, recipe.normal)
-            recipe.normal = nil
-            recipe.expensive = nil
-        end
-    end
-else
-    for _, recipe in pairs(data.raw.recipe) do
-        set_recipe(recipe)
-        if not recipe.enabled and not recipe_list[recipe.name] then
-            recipe.hidden = true
-        end
-        if recipe.expensive == false then
-            set_normal_or_expensive(recipe, recipe.normal)
-            recipe.hidden = true
-            recipe.normal = nil
-            recipe.expensive = nil
-        else
-            set_normal_or_expensive(recipe, recipe.expensive)
-            recipe.normal = nil
-            recipe.expensive = nil
-        end
+for _, recipe in pairs(data.raw.recipe) do
+    set_recipe(recipe, settings.startup["randomtorio-normal-or-expensive"].value)
+    if not recipe.enabled and not recipe_list[recipe.name] then
+        recipe.hidden = true
     end
 end

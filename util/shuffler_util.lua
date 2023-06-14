@@ -15,6 +15,7 @@ local keep_this_safe = {
     fuel_category_to_items = nil,
     item_to_category_with_results = {},
     results_icon = nil,
+    items_should_not_cost = nil,
 }
 
 
@@ -447,10 +448,10 @@ local call_for_science = function()
     return keep_this_safe.call_science
 end
 
-local item_to_all_its_crafts = function(item, unused_recipes)
+local item_to_all_its_crafts = function(item)
     if keep_this_safe.item_to_category_with_results[item] then return keep_this_safe.item_to_category_with_results[item] end
     keep_this_safe.item_to_category_with_results[item] = {}
-    for category, result_list in pairs(unused_recipes.results) do
+    for category, result_list in pairs(get_fresh_recipe_copy().results) do
         for _, results in pairs(result_list) do
             for _, result in pairs(results) do
                 if result.name == item then
@@ -459,7 +460,7 @@ local item_to_all_its_crafts = function(item, unused_recipes)
             end
         end
     end
-    for _, recipe in pairs(s_util.get_resource_list()) do
+    for _, recipe in pairs(get_resource_list()) do
         if recipe.results then
             for _, result in pairs(recipe.results) do
                 if result.name == item then
@@ -493,7 +494,7 @@ local result_to_icon_write = function()
                 break
             end
         end
-        result_icon[storage_name] = nil
+        --result_icon[storage_name] = nil
     end
 end
 
@@ -518,6 +519,22 @@ local calculate_item_costs = function(made_items, costs, result_name, result_amo
         made_items[result_name] = 1
     end
     return
+end
+
+local get_items_should_not_cost = function()
+    if keep_this_safe.items_should_not_cost then return keep_this_safe.items_should_not_cost end
+    keep_this_safe.items_should_not_cost = {items = {}, cost = r_util.settings_extractor("randomtorio-do-not-use")}     
+    for name, info in pairs(s_util.call_for_science()) do
+        if info.pack or info.item then
+            keep_this_safe.items_should_not_cost.items[name] = true
+        end
+    end
+    if settings.startup["randomtorio-force-restriction"].value then
+        for index, name in pairs(r_util.settings_extractor("randomtorio-display-costs")) do 
+            keep_this_safe.items_should_not_cost.items[name] = true
+        end
+    end
+    return keep_this_safe.items_should_not_cost
 end
 
 local costs_calculator = function()
@@ -762,6 +779,7 @@ local functions = {
     item_to_all_its_crafts = item_to_all_its_crafts,
     result_to_icon_store = result_to_icon_store,
     result_to_icon_write = result_to_icon_write,
+    get_items_should_not_cost = get_items_should_not_cost,
     costs_calculator = costs_calculator,
     log_seed_info = log_seed_info,
 }

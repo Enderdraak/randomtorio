@@ -86,7 +86,10 @@ local storage_function_reset = function()
         items = {},
         energy = {},
         results = {},
-        early = {},
+        early = {
+            items = {},
+            results = {},
+        },
     }
     items_to_recipes = {}
     picked_energy_paths = {}
@@ -259,7 +262,7 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
     local energies_to_make = {}
     for item, _ in pairs(items) do
         if not items_to_recipes[item] then
-            items_to_recipes[item] = s_util.item_to_all_its_crafts(item, unused_recipes)[r_util.random(#s_util.item_to_all_its_crafts(item, unused_recipes))]
+            items_to_recipes[item] = s_util.item_to_all_its_crafts(item)[r_util.random(#s_util.item_to_all_its_crafts(item))]
         end
         if items_to_recipes[item] then
             return_list.results[items_to_recipes[item].category] = return_list.results[items_to_recipes[item].category] or {}
@@ -398,6 +401,60 @@ local get_required_items = function(energy_types, made_items, avaible_crafting, 
                 required_items_store.energy[energy] = nil
             end
         end
+
+        -- check the early items, if the RNG from this place picked a stone furnace, but other RNG gave an electric furnace. Remove the stone one.
+        for _, list in pairs(r_util.settings_extractor("randomtorio-start-with")) do
+            local item = list
+            local is_made = false
+
+            --check if it got a list and checks all items in that list.
+            if type(list) ~= "string" then
+                for index, objects in pairs(list) do
+                    if made_items[objects] then
+                        is_made = true
+                    end
+                    if required_items_store.early.items[object] then
+                        item =  object
+                    end
+                end
+            end
+            if type(item) == "string" then
+                if made_items[item] then
+                    is_made = true
+                end
+                if is_made then
+
+                    --removes the result of the item from required_items_store.results
+                    for category, list in pairs(required_items_store.results) do
+                        for index, result in pairs(list) do
+                            if table.compare(result, items_to_recipes[item]) then
+                                table.remove(required_items_store.results[category], index) --remove the item you needed to craft early form that list.
+                                if table_size(required_items_store.results[category]) == 0 then
+                                    required_items_store.results[category] = nil
+                                    if table_size(required_items_store.results) == 0 then
+                                        good_to_go = false --if no more things are in the list then get a new list.
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    --removes the result of the item from required_items_store.early.results
+                    for category, list in pairs(required_items_store.early.results) do
+                        for index, result in pairs(list) do
+                            if table.compare(result, items_to_recipes[item]) then
+                                table.remove(required_items_store.early.results[category], index) --remove the item you needed to craft early form that list.
+                                if table_size(required_items_store.early.results[category]) == 0 then
+                                    required_items_store.early.results[category] = nil
+                                end
+                            end
+                        end
+                    end
+                    required_items_store.early.items[item] = nil
+                    required_items_store.items[item] = nil
+                end
+            end
+        end
+
         if good_to_go then return required_items_store.results end
         --log("not returned")
     else
@@ -427,14 +484,22 @@ local get_required_items = function(energy_types, made_items, avaible_crafting, 
         end
     end
 
-    if table_size(required_items_store.early) == 0 then
+    if table_size(required_items_store.early.items) == 0 then
         for _, list in pairs(r_util.settings_extractor("randomtorio-start-with")) do
             local name = list
+            local already_exists = false
             if type(list) ~= "string" then
+                for _, object in pairs(list) do
+                    if made_items[object] then
+                        already_exists = true
+                    end
+                end
                 name = list[r_util.random(table_size(list))]
             end
-            required_items_store.items[name] = true
-            required_items_store.early[name] = true
+            if already_exists == false and not made_items[name] then
+                required_items_store.items[name] = true
+                required_items_store.early.items[name] = true
+            end
         end
     end
 
@@ -549,7 +614,7 @@ local get_required_items = function(energy_types, made_items, avaible_crafting, 
         end
     end
 
-    return required_items_store.results
+    return required_items_store.results, required_items_store.early.results
 end
 
 local get_list_of_items_that_open_possibilities = function(rand_ingredients, unused_recipes, made_items, avaible_crafting, energy_types)
@@ -718,7 +783,7 @@ functions.run = function(logs)
     
     storage_function_reset()
 
-    local required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes, logs)
+    local required_items, early_required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes, logs)
 
     unlock_locked_recipes(locked_recipes, avaible_crafting, made_items)
     new_stuff(unused_recipes, ingredients_to_pick, avaible_crafting, made_items)
@@ -736,7 +801,7 @@ functions.run = function(logs)
 
     while #ingredients_to_pick >= 1 do
 
-        required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes, logs)
+        required_items, early_required_items = get_required_items(energy_types, made_items, avaible_crafting, unused_recipes, logs)
 
         if logs then
             log("required items:  "..serpent.line(required_items))
@@ -769,11 +834,21 @@ functions.run = function(logs)
 
         if required_items[rand_ingredients.crafting_category] then
             if #required_items[rand_ingredients.crafting_category] >= #researched_recipes[rand_ingredients.crafting_category] + 1 then
-                rand_num = r_util.random(#required_items[rand_ingredients.crafting_category])
-                for index, result in pairs(unused_recipes.results[rand_ingredients.crafting_category]) do
-                    if table.compare(required_items[rand_ingredients.crafting_category][rand_num], result) then
-                        rand_num = index
-                        break
+                if early_required_items and #early_required_items[rand_ingredients.crafting_category] then
+                    rand_num = r_util.random(#early_required_items[rand_ingredients.crafting_category])
+                    for index, result in pairs(unused_recipes.results[rand_ingredients.crafting_category]) do
+                        if table.compare(early_required_items[rand_ingredients.crafting_category][rand_num], result) then
+                            rand_num = index
+                            break
+                        end
+                    end
+                else
+                    rand_num = r_util.random(#required_items[rand_ingredients.crafting_category])
+                    for index, result in pairs(unused_recipes.results[rand_ingredients.crafting_category]) do
+                        if table.compare(required_items[rand_ingredients.crafting_category][rand_num], result) then
+                            rand_num = index
+                            break
+                        end
                     end
                 end
             else
@@ -828,6 +903,15 @@ functions.run = function(logs)
     if table_size(unused_recipes.ingredients) >= 1 or table_size(ingredients_to_pick) >= 1 then
         return false
     else
+        local items_should_not_cost = s_util.get_items_should_not_cost()
+        local cost_list = s_util.costs_calculator()
+        for name, _ in pairs(items_should_not_cost.items) do
+            for _, item in pairs(items_should_not_cost.cost) do
+                if cost_list[name] and cost_list[name][item] then
+                    return false
+                end
+            end
+        end
         return true
     end
 end
@@ -844,29 +928,18 @@ functions.multiruns = function()
     functions.startup()
     local count = 0
     local seed = settings.startup["randomtorio-randomseed"].value
-    local items_should_not_cost = {items = {}, cost = r_util.settings_extractor("randomtorio-do-not-use")}     
-    for name, info in pairs(s_util.call_for_science()) do
-        if info.pack or info.item then
-            items_should_not_cost.items[name] = true
-        end
-    end
-    if settings.startup["randomtorio-force-restriction"].value then
-        for index, name in pairs(r_util.settings_extractor("randomtorio-display-costs")) do 
-            items_should_not_cost.items[name] = true
-        end
-    end
     if settings.startup["randomtorio-keep-icon-with-result"].value then
         s_util.result_to_icon_store()
     end
 
     s_util.log_seed_info("startup")
 
-    local possible 
-    if logseeds[seed] then
-        possible = functions.run(true)
-    else
-        possible = functions.run()
+    local possible = functions.run(logseeds[seed])
+    if possible and settings.startup["randomtorio-keep-on-looking"].value then
+        s_util.log_seed_info(seed, true)
+        possible = false
     end
+
     while not possible and count < settings.startup["randomtorio-check-amount"].value do
         count = count + 1
         seed = seed + 1
@@ -875,36 +948,20 @@ functions.multiruns = function()
         if count % settings.startup["randomtorio-log-seed-gap"].value == 0 then
             log("current seed is: "..seed)
         end
-        if logseeds[seed] then
-            possible = functions.run(true)
-        else
-            possible = functions.run()
-        end
-        if possible then
-            local cost_list = s_util.costs_calculator()
-            for name, _ in pairs(items_should_not_cost.items) do
-                for _, item in pairs(items_should_not_cost.cost) do
-                    if cost_list[name] and cost_list[name][item] then
-                        possible = false
-                        break
-                    end
-                end
-                if possible == false then
-                    break
-                end
-            end
-        end
+        
+        possible = functions.run(logseeds[seed])
         if possible and settings.startup["randomtorio-keep-on-looking"].value then
             s_util.log_seed_info(seed, true)
             possible = false
-        end            
+        end
+
     end
 
     
     if settings.startup["randomtorio-keep-icon-with-result"].value then
         s_util.result_to_icon_write()
     end
-        
+  
     s_util.log_seed_info(seed, possible)
 end
 
