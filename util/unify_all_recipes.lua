@@ -119,57 +119,83 @@ local is_equipment = function(name)
 end
 
 local set_recipe = function(recipe, difficulty)
+
+    if recipe.normal == false and difficulty == "normal" then
+        if recipe.expensive then
+            set_normal_or_expensive(recipe, recipe.expensive)
+        end
+        recipe.normal = nil
+        recipe.expensive = nil
+        recipe.hidden = true
+    elseif recipe.expensive == false and difficulty == "expensive" then
+        if recipe.normal then
+            set_normal_or_expensive(recipe, recipe.normal)
+        end
+        recipe.normal = nil
+        recipe.expensive = nil
+        recipe.hidden = true
+    elseif recipe.normal == nil and recipe.expensive == nil then
+        if recipe.enabled == nil then
+            recipe.enabled = true
+        end
+    elseif recipe.normal == nil then
+        if recipe.expensive.enabled == nil then
+            recipe.expensive.enabled = true
+        end
+        set_normal_or_expensive(recipe, recipe.expensive)
+        recipe.expensive = nil
+    elseif recipe.expensive == nil then
+        if recipe.normal.enabled == nil then
+            recipe.normal.enabled = true
+        end
+        set_normal_or_expensive(recipe, recipe.normal)
+        recipe.normal = nil
+    else
+        if difficulty == "normal" then
+            if recipe.normal.enabled == nil then
+                recipe.normal.enabled = true
+            end
+            set_normal_or_expensive(recipe, recipe.normal)
+            recipe.normal = nil
+            recipe.expensive = nil
+        end
+        if difficulty == "expensive" then
+            if recipe.expensive.enabled == nil then
+                recipe.expensive.enabled = true
+            end
+            set_normal_or_expensive(recipe, recipe.expensive)
+            recipe.normal = nil
+            recipe.expensive = nil
+        end
+    end
+    set_propper_results(recipe, recipe.name)
+    set_propper_ingredients(recipe)
+
     local base_item = {}
     
     if recipe.main_product and recipe.main_product ~= "" then
         base_item = get_item_deepcopy(recipe.main_product)
-    elseif recipe.normal and recipe.normal.main_product and recipe.normal.main_product ~= "" then
-        base_item = get_item_deepcopy(recipe.normal.main_product)
-    elseif recipe.expensive and recipe.expensive.main_product and recipe.expensive.main_product ~= "" then
-        base_item = get_item_deepcopy(recipe.expensive.main_product)
     elseif recipe.result then
         base_item = get_item_deepcopy(recipe.result)
-    elseif recipe.normal and recipe.normal.result then
-        base_item = get_item_deepcopy(recipe.normal.result)
-    elseif recipe.expensive and recipe.expensive.result then
-        base_item = get_item_deepcopy(recipe.expensive.result)
     elseif recipe.results and #recipe.results == 1 then
         if recipe.results[1].name then
             base_item = get_item_deepcopy(recipe.results[1].name)
         else
             base_item = get_item_deepcopy(recipe.results[1][1])
         end
-    elseif recipe.normal and recipe.normal.results and #recipe.normal.results == 1 then
-        if recipe.normal.results[1].name then
-            base_item = get_item_deepcopy(recipe.normal.results[1].name)
-        else
-            base_item = get_item_deepcopy(recipe.normal.results[1][1])
-        end
-    elseif recipe.expensive and recipe.expensive.results and #recipe.expensive.results == 1 then
-        if recipe.expensive.results[1].name then
-            base_item = get_item_deepcopy(recipe.expensive.results[1].name)
-        else
-            base_item = get_item_deepcopy(recipe.expensive.results[1][1])
-        end
     else
         base_item = get_item_deepcopy(recipe.name)
     end
-    recipe.category = recipe.category or "crafting"
     
-    if not recipe.icons then
-        if recipe.icon then
-            recipe.icons = {{icon = r_util.deepcopy(recipe.icon), icon_size = r_util.deepcopy(recipe.icon_size), icon_mipmaps = r_util.deepcopy(recipe.icon_mipmaps)}}
-            recipe.icon = nil
-            recipe.icon_size = nil
-            recipe.icon_mipmaps = nil
-        else
-            if not base_item then
-                log(serpent.line(recipe))
-                log(serpent.line(base_item))
-                error(recipe.name.." has no base item or fluid found to take icons from and the recipe does not have any on its own")
-            end
-            recipe.icons = get_propper_icons(base_item)
+    if recipe.icons or recipe.icon then
+        recipe.icons = get_propper_icons(recipe)
+    else
+        if not base_item then
+            log(serpent.line(recipe))
+            log(serpent.line(base_item))
+            error(recipe.name.." has no base item or fluid found to take icons from and the recipe does not have any on its own")
         end
+        recipe.icons = get_propper_icons(base_item)
     end
     
     if not recipe.order then
@@ -223,57 +249,9 @@ local set_recipe = function(recipe, difficulty)
         end
     end
 
-    if recipe.normal == false and difficulty == "normal" then
-        if recipe.expensive then
-            set_normal_or_expensive(recipe, recipe.expensive)
-        end
-        recipe.normal = nil
-        recipe.expensive = nil
-        recipe.hidden = true
-    elseif recipe.expensive == false and difficulty == "expensive" then
-        if recipe.normal then
-            set_normal_or_expensive(recipe, recipe.normal)
-        end
-        recipe.normal = nil
-        recipe.expensive = nil
-        recipe.hidden = true
-    elseif recipe.normal == nil and recipe.expensive == nil then
-        if recipe.enabled == nil then
-            recipe.enabled = true
-        end
-    elseif recipe.normal == nil then
-        if recipe.expensive.enabled == nil then
-            recipe.expensive.enabled = true
-        end
-        set_normal_or_expensive(recipe, recipe.expensive)
-        recipe.expensive = nil
-    elseif recipe.expensive == nil then
-        if recipe.normal.enabled == nil then
-            recipe.normal.enabled = true
-        end
-        set_normal_or_expensive(recipe, recipe.normal)
-        recipe.normal = nil
-    else
-        if difficulty == "normal" then
-            if recipe.normal.enabled == nil then
-                recipe.normal.enabled = true
-            end
-            set_normal_or_expensive(recipe, recipe.normal)
-            recipe.normal = nil
-            recipe.expensive = nil
-        end
-        if difficulty == "expensive" then
-            if recipe.expensive.enabled == nil then
-                recipe.expensive.enabled = true
-            end
-            set_normal_or_expensive(recipe, recipe.expensive)
-            recipe.normal = nil
-            recipe.expensive = nil
-        end
-    end
-    set_propper_results(recipe, recipe.name)
-    set_propper_ingredients(recipe)
+    recipe.category = recipe.category or "crafting"
     recipe.always_show_products = true
+    recipe.main_product = nil
 end
 
 local recipe_list = {}

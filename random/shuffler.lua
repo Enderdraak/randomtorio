@@ -68,6 +68,7 @@ local science
 local items_to_recipes
 local picked_energy_paths
 local energy_type_for_item
+local category_to_item
 local storage_function_reset = function()
     science = {
         lab = {},
@@ -94,6 +95,7 @@ local storage_function_reset = function()
     items_to_recipes = {}
     picked_energy_paths = {}
     energy_type_for_item = {}
+    category_to_item = {}
 end
 
 local science_unlock = function(item, energy_types, researched_recipes)
@@ -195,7 +197,7 @@ local science_unlock = function(item, energy_types, researched_recipes)
     return unlock_new
 end
 
-local get_all_energy_types = function(item)
+local get_all_energy_types = function(item, logs)
     local place_result
     if data.raw.item[item] then
         if data.raw.item[item].place_result then
@@ -206,6 +208,9 @@ local get_all_energy_types = function(item)
                 end
             end
             if place_result then
+                if logs then
+                    log("place result: "..serpent.line(place_result))
+                end
                 local energy_source
                 for _, places in pairs({"burner","energy_source"}) do
                     if place_result[places] then
@@ -213,13 +218,18 @@ local get_all_energy_types = function(item)
                         break
                     end
                 end
-                if energy_source == nil then return nil end
+                if energy_source == nil then return nil end   
+                if logs then
+                    log("energy source: "..serpent.line(energy_source))
+                end
                 local energies = {}
                 if energy_source.type == "burner" then 
                     if energy_source.fuel_categories then
                         energies = energy_source.fuel_categories
+                    elseif energy_source.fuel_category then
+                        table.insert(energies, energy_source.fuel_category)
                     else
-                    table.insert(energies, energy_source.fuel_category)
+                        energies = {"chemical"}
                     end
                 end
                 if energy_source.type ~= "burner" then table.insert(energies, energy_source.type) end
@@ -239,8 +249,12 @@ local get_a_energy_type = function(item)
 end
 
 
-local has_power = function(item, energy_types)
-    local energies = get_all_energy_types(item)
+local has_power = function(item, energy_types, logs)
+    local energies = get_all_energy_types(item, logs)
+    if logs then
+        log(serpent.line(energies))
+        log(serpent.line(energy_types))
+    end
     if energies then
         for _, fuel in pairs(energies) do
             if energy_types[fuel] then
@@ -260,15 +274,25 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
         results = {},
     }
     local energies_to_make = {}
+    if logs then
+        log("came in here")
+    end
     for item, _ in pairs(items) do
+        if logs then
+            log(item)
+            log(serpent.line(items_to_recipes))
+        end
         if not items_to_recipes[item] then
             items_to_recipes[item] = s_util.item_to_all_its_crafts(item)[r_util.random(#s_util.item_to_all_its_crafts(item))]
+        end
+        if logs then
+            log(serpent.line(items_to_recipes[item]))
         end
         if items_to_recipes[item] then
             return_list.results[items_to_recipes[item].category] = return_list.results[items_to_recipes[item].category] or {}
             table.insert(return_list.results[items_to_recipes[item].category], items_to_recipes[item].results)
         end
-        if not has_power(item, energy_types) then
+        if not has_power(item, energy_types, logs) then
             energies_to_make[get_a_energy_type(item)] = true
         end
     end
@@ -282,10 +306,10 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
     end
     local more_items = {}
     for category, _ in pairs(list_to_make_more) do
-        if not items_to_recipes[category] then
-            items_to_recipes[category] = s_util.get_list_categories_that_get_unlocked_by_items()[category][r_util.random(#s_util.get_list_categories_that_get_unlocked_by_items()[category])]
+        if not category_to_item[category] then
+            category_to_item[category] = s_util.get_list_categories_that_get_unlocked_by_items()[category][r_util.random(#s_util.get_list_categories_that_get_unlocked_by_items()[category])]
         end
-        more_items[items_to_recipes[category]] = true
+        more_items[category_to_item[category]] = true
     end
 
     if logs then
@@ -319,6 +343,9 @@ item_to_crafts = function(items, avaible_crafting, unused_recipes, energy_types,
     end
     
     if table_size(more_items) >= 1 then
+        if logs then
+            log("these items still need to be crafted: "..serpent.line(more_items))
+        end
         local crafted_items = r_util.deepcopy(made_items)
         for item, _ in pairs(items) do
             crafted_items[item] = true
@@ -805,6 +832,7 @@ functions.run = function(logs)
 
         if logs then
             log("required items:  "..serpent.line(required_items))
+            log("ingredients_to_pick: "..serpent.line(ingredients_to_pick))
         end
         if nothing_left(ingredients_to_pick, avaible_crafting, researched_recipes) then
             break
@@ -922,7 +950,7 @@ end
 
 functions.multiruns = function()
     logseeds = {
-        --53 = true,
+        --[24] = true,
     }
 
     functions.startup()
@@ -956,12 +984,11 @@ functions.multiruns = function()
         end
 
     end
-
     
     if settings.startup["randomtorio-keep-icon-with-result"].value then
         s_util.result_to_icon_write()
     end
-  
+
     s_util.log_seed_info(seed, possible)
 end
 
